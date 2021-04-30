@@ -27,3 +27,11 @@ fn read_file(file_path: String) -> String {
     return f.trim().to_string();
 }
 
+#[cfg(test)]
+mod tests {
+    use crate::Tokenize;
+    #[test]
+    fn test_tokenize() {
+        assert_eq!("Hello World".to_string().tokenize(), vec!["Hello", "World"])
+    }
+}
