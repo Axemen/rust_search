@@ -1,12 +1,15 @@
 [package]
-name = "rust_search"
+name = "search"
 version = "0.1.0"
 authors = ["Jonathan Randolph <Jrandolph011@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+name="search"
+path="src/lib.rs"
+
 [dependencies]
 regex = "1"
-search = {path = "./search"}
 glob = "0.3.0"

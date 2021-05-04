@@ -1,40 +1,22 @@
-use regex::Regex;
+use search::utils::find_files;
+use search::index::TFDocument;
+use std::collections::HashMap;
+use search::preprocessing::tokenize;
 use std::fs;
 
-trait Tokenize {
-    fn tokenize(self) -> Vec<String>;
-}
-
-impl Tokenize for String {
-    fn tokenize(self) -> Vec<String> {
-        let word_regex = Regex::new(r"\b\w*\b").unwrap();
-        let tokens = word_regex
-            .captures_iter(&self)
-            .map(|x| x[0].to_string())
-            .collect();
-        return tokens;
-    }
-}
-
-fn read_file(file_path: String) -> String {
-    let f = fs::read_to_string(file_path).expect("Could not read the file");
-    return f.trim().to_string();
-}
-
 fn main() {
-    let contents = read_file("test.txt".to_string());
-    let tokens: Vec<String> = contents.tokenize();
+    let paths = find_files(r"E:\data\opinions\**\*".to_string());
 
-    for token in tokens {
-        println!("{}", token);
-    }
-}
+    let mut index: HashMap<String, TFDocument> = HashMap::new();
 
-#[cfg(test)]
-mod tests {
-    use crate::Tokenize;
-    #[test]
-    fn test_tokenize() {
-        assert_eq!("Hello World".to_string().tokenize(), vec!["Hello", "World"])
+    for path in paths {
+
+        let text = fs::read_to_string(path).expect("Could not read file");
+        // let mut tokens: Vec<String> = Vec::new();
+        let tokens: Vec<String> = tokenize(text);
+        
+
+        println!("{}", &tokens[0]);
+        break
     }
 }

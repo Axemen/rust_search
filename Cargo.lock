@@ -10,6 +10,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "glob"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b919933a397b79c37e33b77bb2aa3dc8eb6e165ad809e58ff75bc7db2e34574"
+
+[[package]]
 name = "memchr"
 version = "2.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -36,5 +42,15 @@ checksum = "24d5f089152e60f62d28b835fbff2cd2e8dc0baf1ac13343bef92ab7eed84548"
 name = "rust_search"
 version = "0.1.0"
 dependencies = [
+ "glob",
+ "regex",
+ "search",
+]
+
+[[package]]
+name = "search"
+version = "0.1.0"
+dependencies = [
+ "glob",
  "regex",
 ]
