@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs;
 use std::io;
 
@@ -26,7 +26,7 @@ pub trait Searcher {
     fn index_file(self, path: String) -> Result<(), io::Error>;
     fn fast_cosine_scores(&self, term: String) -> HashMap<i32, f32>;
     fn lookup(self, terms: Vec<String>) -> Vec<i32>;
-    // fn remove(self, term: String) -> Option<()>;
+    fn remove(self, term: String) -> Result<(), io::Error>;
 }
 
 impl Searcher for Search {
@@ -78,10 +78,18 @@ impl Searcher for Search {
 
         let mut scores: Vec<ScoredDocument> = all_scores
             .iter()
-            .map(|(k, v)| ScoredDocument { id: *k, score: *v as i32 })
+            .map(|(k, v)| ScoredDocument {
+                id: *k,
+                score: *v as i32,
+            })
             .collect();
 
         scores.sort_by_key(|a| a.score);
         return scores.iter().map(|x| x.id).collect();
+    }
+
+    fn remove(mut self, term: String) -> Result<(), io::Error> {
+        self.index.remove_entry(&term);
+        Ok(())
     }
 }
