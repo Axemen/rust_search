@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::io;
+use std::fs;
 
 pub mod index;
 pub mod preprocessing;
@@ -14,16 +15,16 @@ pub struct Search {
     index: HashMap<String, Vec<TFDocument>>,
 }
 
-pub trait search {
-    fn index_document(self, text: String) -> Result<(), io::Error>;
-    // fn index_file(self, path: String) -> Option<()>;
+pub trait Searcher {
+    fn index_document(self, text: String);
+    fn index_file(self, path: String) -> Result<(), io::Error>;
     // fn fast_cosine_score(self, term: String) -> u32;
     // fn lookup(self, terms: Vec<String>) -> Vec<String>;
     // fn remove(self, term: String) -> Option<()>;
 }
 
-impl search for Search {
-    fn index_document(mut self, text: String) -> Result<(), io::Error> {
+impl Searcher for Search {
+    fn index_document(mut self, text: String) {
         let tokens = preprocessing::tokenize(text);
         let counts = utils::count_tokens(tokens.to_vec());
         for token in tokens {
@@ -37,6 +38,11 @@ impl search for Search {
                 self.index.get_mut(&token).unwrap().push(doc);
             }
         }
+    }
+
+    fn index_file(self, path:String) -> Result<(), io::Error> {
+        let text = fs::read_to_string(path).expect("Failed to read file");
+        self.index_document(text);
         return Ok(());
     }
 }
