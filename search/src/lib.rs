@@ -32,11 +32,7 @@ impl Searcher for Search {
                 count: counts[&token] as i32,
                 document_id: self.index.len() as i32,
             };
-            if !self.index.contains_key(&token) {
-                self.index.insert(token.to_owned().to_owned(), vec![doc]);
-            } else {
-                self.index.get_mut(&token).unwrap().push(doc);
-            }
+            self.index.entry(token).or_insert(Vec::new()).push(doc);
         }
     }
 

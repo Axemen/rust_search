@@ -22,12 +22,7 @@ pub fn find_files(path: String) -> Vec<std::path::PathBuf> {
 pub fn count_tokens(tokens: Vec<String>) -> HashMap<String, u32> {
     let mut counts: HashMap<String, u32> = HashMap::new();
     for token in tokens {
-        let t = token.to_owned().to_owned();
-        if !counts.contains_key(&token) {
-            counts.insert(token, 1);
-        } else {
-            counts[&token] = counts[&token] + 1;
-        }
+        *counts.entry(token).or_insert(0) += 1;
     }
     return counts;
 }
