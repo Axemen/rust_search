@@ -5,11 +5,6 @@ use std::io;
 pub mod preprocessing;
 pub mod utils;
 
-struct ScoredDocument {
-    id: i32,
-    score: i32,
-}
-
 pub struct Document {
     pub name: String,
 }
@@ -21,15 +16,15 @@ pub struct Index {
 
 pub trait Searchable {
     fn new() -> Index;
-    fn index_document(&mut self, text:String, name:String) -> Option<()>;
-    fn index_file(&mut self, path:String) -> Result<(), io::Error>;
+    fn index_document(&mut self, text: String, name: String) -> Option<()>;
+    fn index_file(&mut self, path: String) -> Result<(), io::Error>;
     fn fast_cosine_scores(&self, term: String) -> HashMap<i32, f32>;
     fn rank(&self, terms: Vec<String>) -> Vec<i32>;
     fn remove(&mut self, term: String) -> Result<(), io::Error>;
     fn lookup(&self, terms: Vec<String>);
 }
 
-impl Searchable for Index{
+impl Searchable for Index {
     fn new() -> Index {
         return Index {
             index: HashMap::new(),
@@ -74,7 +69,9 @@ impl Searchable for Index{
     }
 
     fn rank(&self, terms: Vec<String>) -> Vec<i32> {
+
         let mut all_scores: HashMap<i32, f32> = HashMap::new();
+
         for term in terms {
             let term_scores = self.fast_cosine_scores(term);
             for (k, v) in term_scores {
@@ -82,17 +79,12 @@ impl Searchable for Index{
             }
         }
 
-        let mut scores: Vec<ScoredDocument> = all_scores
+        let mut scores: Vec<Vec<i32>> = all_scores
             .iter()
-            .map(|(k, v)| ScoredDocument {
-                id: *k,
-                score: *v as i32,
-            })
+            .map(|(k, v)| vec![*k, *v as i32])
             .collect();
-
-        scores.sort_by_key(|a| a.score);
-        let ranks: Vec<i32> =  scores.iter().map(|x| x.id).collect();
-        return ranks;
+        scores.sort_by_key(|x| x[1]);
+        return scores.iter().map(|x| x[0]).collect();
     }
 
     fn remove(&mut self, term: String) -> Result<(), io::Error> {
@@ -106,5 +98,4 @@ impl Searchable for Index{
             println!("{:?}", self.documents[&id].name);
         }
     }
-
 }
