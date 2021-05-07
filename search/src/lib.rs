@@ -1,14 +1,18 @@
 use std::collections::HashMap;
 use std::fs;
 use std::io;
+use serde::{Deserialize, Serialize};
+use serde_json;
 
 pub mod preprocessing;
 pub mod utils;
 
+#[derive(Serialize, Deserialize)]
 pub struct Document {
     pub name: String,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Index {
     pub index: HashMap<String, HashMap<i32, i32>>,
     pub documents: HashMap<i32, Document>,
@@ -19,9 +23,11 @@ pub trait Searchable {
     fn index_document(&mut self, text: String, name: String) -> Option<()>;
     fn index_file(&mut self, path: String) -> Result<(), io::Error>;
     fn fast_cosine_scores(&self, term: String) -> HashMap<i32, f32>;
-    fn rank(&self, terms: Vec<String>) -> Vec<i32>;
+    fn rank(&self, terms: Vec<String>) -> Vec<Vec<i32>>;
     fn remove(&mut self, term: String) -> Result<(), io::Error>;
     fn lookup(&self, terms: Vec<String>);
+    fn load(path: String) -> Option<Index>;
+    fn save(&self, path: &str) -> Result<(), io::Error>;
 }
 
 impl Searchable for Index {
@@ -68,7 +74,7 @@ impl Searchable for Index {
         return scores;
     }
 
-    fn rank(&self, terms: Vec<String>) -> Vec<i32> {
+    fn rank(&self, terms: Vec<String>) -> Vec<Vec<i32>> {
 
         let mut all_scores: HashMap<i32, f32> = HashMap::new();
 
@@ -84,7 +90,8 @@ impl Searchable for Index {
             .map(|(k, v)| vec![*k, *v as i32])
             .collect();
         scores.sort_by_key(|x| x[1]);
-        return scores.iter().map(|x| x[0]).collect();
+        scores.reverse();
+        return scores;
     }
 
     fn remove(&mut self, term: String) -> Result<(), io::Error> {
@@ -93,9 +100,19 @@ impl Searchable for Index {
     }
 
     fn lookup(&self, terms: Vec<String>) {
-        let ranks = self.rank(terms);
-        for id in ranks {
-            println!("{:?}", self.documents[&id].name);
+        let results = self.rank(terms);
+        for doc in results {
+            println!("{:?}: {:?}", self.documents[&doc[0]].name, doc[1]);
         }
+    }
+
+    fn load(path:String) -> Option<Index> {
+        let contents: String = fs::read_to_string(path).unwrap();
+        return Some(serde_json::from_str(&contents).unwrap());
+    }
+
+    fn save(&self, path:&str) -> Result<(), io::Error>{
+        fs::write(path, serde_json::to_string(self).unwrap())?;
+        return Ok(());
     }
 }
