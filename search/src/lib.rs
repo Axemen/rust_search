@@ -1,8 +1,8 @@
+use serde::{Deserialize, Serialize};
+use serde_json;
 use std::collections::HashMap;
 use std::fs;
 use std::io;
-use serde::{Deserialize, Serialize};
-use serde_json;
 
 pub mod preprocessing;
 pub mod utils;
@@ -10,6 +10,12 @@ pub mod utils;
 #[derive(Serialize, Deserialize)]
 pub struct Document {
     pub name: String,
+    pub length: u32,
+}
+
+pub struct SearchResult {
+    pub score: f32,
+    pub doc_id: i32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -20,14 +26,15 @@ pub struct Index {
 
 pub trait Searchable {
     fn new() -> Index;
-    fn index_document(&mut self, text: String, name: String) -> Option<()>;
-    fn index_file(&mut self, path: String) -> Result<(), io::Error>;
+    fn index_document(&mut self, text: &str, name: &str) -> Option<()>;
+    fn index_file(&mut self, path: &str) -> Result<(), io::Error>;
     fn fast_cosine_scores(&self, term: String) -> HashMap<i32, f32>;
-    fn rank(&self, terms: Vec<String>) -> Vec<Vec<i32>>;
+    fn rank(&self, terms: Vec<String>) -> Vec<SearchResult>;
     fn remove(&mut self, term: String) -> Result<(), io::Error>;
     fn lookup(&self, terms: Vec<String>);
-    fn load(path: String) -> Option<Index>;
+    fn load(path: &str) -> Result<Index, io::Error>;
     fn save(&self, path: &str) -> Result<(), io::Error>;
+    fn bm25_search(&self, query: &str);
 }
 
 impl Searchable for Index {
@@ -38,12 +45,25 @@ impl Searchable for Index {
         };
     }
 
-    fn index_document(&mut self, text: String, name: String) -> Option<()> {
+    fn index_document(&mut self, text: &str, name: &str) -> Option<()> {
         let doc_id = self.documents.len() as i32;
-        self.documents.insert(doc_id, Document { name: name });
 
         let tokens = preprocessing::tokenize(text);
         let counts = utils::count_tokens(tokens.to_vec());
+
+        // calculate the document length in tokens
+        let mut length = 0;
+        for (_, v) in &counts {
+            length += v;
+        }
+
+        self.documents.insert(
+            doc_id,
+            Document {
+                name: name.to_owned(),
+                length: length,
+            },
+        );
 
         for token in tokens {
             *self
@@ -56,9 +76,9 @@ impl Searchable for Index {
         return Some(());
     }
 
-    fn index_file(&mut self, path: String) -> Result<(), io::Error> {
-        let text = fs::read_to_string(&path).expect("Failed to read file");
-        self.index_document(text, path);
+    fn index_file(&mut self, path: &str) -> Result<(), io::Error> {
+        let text = fs::read_to_string(path).expect("Failed to read file");
+        self.index_document(&text, path);
         return Ok(());
     }
 
@@ -74,8 +94,7 @@ impl Searchable for Index {
         return scores;
     }
 
-    fn rank(&self, terms: Vec<String>) -> Vec<Vec<i32>> {
-
+    fn rank(&self, terms: Vec<String>) -> Vec<SearchResult> {
         let mut all_scores: HashMap<i32, f32> = HashMap::new();
 
         for term in terms {
@@ -85,11 +104,15 @@ impl Searchable for Index {
             }
         }
 
-        let mut scores: Vec<Vec<i32>> = all_scores
+        let mut scores: Vec<SearchResult> = all_scores
             .iter()
-            .map(|(k, v)| vec![*k, *v as i32])
+            .map(|(k, v)| SearchResult {
+                doc_id: *k,
+                score: *v / (self.documents[k].length as f32).sqrt(),
+            })
             .collect();
-        scores.sort_by_key(|x| x[1]);
+
+        scores.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap());
         scores.reverse();
         return scores;
     }
@@ -101,18 +124,65 @@ impl Searchable for Index {
 
     fn lookup(&self, terms: Vec<String>) {
         let results = self.rank(terms);
-        for doc in results {
-            println!("{:?}: {:?}", self.documents[&doc[0]].name, doc[1]);
+        for result in results {
+            println!(
+                "{:?}: {:?}",
+                self.documents[&result.doc_id].name, result.score
+            );
         }
     }
 
-    fn load(path:String) -> Option<Index> {
+    fn load(path: &str) -> Result<Index, io::Error> {
         let contents: String = fs::read_to_string(path).unwrap();
-        return Some(serde_json::from_str(&contents).unwrap());
+        return Ok(serde_json::from_str(&contents).unwrap());
     }
 
-    fn save(&self, path:&str) -> Result<(), io::Error>{
+    fn save(&self, path: &str) -> Result<(), io::Error> {
         fs::write(path, serde_json::to_string(self).unwrap())?;
         return Ok(());
+    }
+
+    fn bm25_search(&self, query: &str) {
+        let query_terms = preprocessing::tokenize(query);
+        let mut scores: HashMap<i32, f32> = HashMap::new();
+        let n = self.documents.len() as f32;
+        let k = 1.5;
+        let b = 0.75;
+        let mut query_idf_sum: f32 = 0.0;
+
+        let avgdl: u32 = self.documents.iter().map(|(_doc_id, doc)| doc.length).sum();
+
+        for term in query_terms {
+            let nq = self.index[&term].len() as f32;
+            let idf = ((n - nq + 0.5) / (nq + 0.5) + 1.0).ln();
+
+            for (doc_id, tf) in &self.index[&term] {
+                let num = (*tf as f32) * (k + 1.0) as f32;
+                let den: f32 = (*tf as f32)
+                    + k * (1.0 - b + b * (self.documents[&doc_id].length / avgdl) as f32);
+
+                *scores.entry(*doc_id).or_insert(num / den);
+            }
+
+            query_idf_sum += idf;
+        }
+
+        let mut results: Vec<SearchResult> = scores
+            .iter()
+            .map(|(k, v)| SearchResult {
+                doc_id: *k,
+                score: *v * query_idf_sum,
+            })
+            .collect();
+
+        results.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap());
+        results.reverse();
+
+        for result in results {
+            println!(
+                "{:?}: {:?}",
+                self.documents[&result.doc_id].name, result.score
+            );
+        }
     }
 }

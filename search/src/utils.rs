@@ -1,7 +1,8 @@
 use glob::glob;
 use std::collections::HashMap;
 
-pub fn find_files(path: String) -> Vec<std::path::PathBuf> {
+pub fn find_files(path: String, limit: Option<u32>) -> Vec<std::path::PathBuf> {
+    let l = limit.unwrap_or(u32::MAX);
     let mut paths: Vec<std::path::PathBuf> = Vec::new();
     let mut files_found: u32 = 0;
     println!("Finding Files");
@@ -13,6 +14,9 @@ pub fn find_files(path: String) -> Vec<std::path::PathBuf> {
                 print!("Found {} Files\r", files_found);
             }
             Err(e) => println!("{:?}", e)
+        }
+        if files_found >= l {
+            break;
         }
     }
     println!("Found {} Files", files_found);

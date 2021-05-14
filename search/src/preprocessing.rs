@@ -1,6 +1,6 @@
 use regex::{Regex};
 
-pub fn tokenize(text: String) -> Vec<String> {
+pub fn tokenize(text: &str) -> Vec<String> {
     let lowered = text.to_lowercase();
     let word_regex = Regex::new(r"\b\w*\b").unwrap();
     let captures = word_regex.captures_iter(&lowered);
